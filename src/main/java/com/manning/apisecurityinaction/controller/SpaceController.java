@@ -17,7 +17,15 @@ public class SpaceController {
     public JSONObject createSpace(Request request, Response response) throws SQLException{
         var json = new JSONObject(request.body());
         var spaceName = json.getString("name");
+        // input validation for length
+        if (spaceName.length() > 255){
+            throw new IllegalArgumentException("space name is too long");
+        }
         var owner = json.getString("owner");
+        // input validation for both length and only alfabetic and numeric content
+        if (!owner.matches("[a-zA-Z][a-zA-Z0-9]{1,29}")){
+            throw new IllegalArgumentException("Invalid username:" +  owner);
+        }
 
         return database.withTransaction(tx -> {
             var spaceId = database.findUniqueLong(
@@ -27,7 +35,7 @@ public class SpaceController {
             // security vulnerability!
             database.updateUnique(
                 "INSERT INTO spaces(space_id, name, owner) " +
-                "VALUES(" + spaceId + ", '" + spaceName + "', '" + owner + "');");
+                "VALUES(?, ?, ?);", spaceId, spaceName, owner);
             
             response.status(201);
             response.header("Location", "/spaces/" + spaceId);
