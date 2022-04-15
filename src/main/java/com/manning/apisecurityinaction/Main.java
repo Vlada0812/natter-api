@@ -33,16 +33,24 @@ public class Main {
         after((request, response) -> {
             response.type("application/json");
         });
+        // Remove the header containing the server type from the response
+        afterAfter((request, response) ->
+            response.header("Server", ""));
 
         internalServerError(new JSONObject()
             .put("error", "internal server error").toString());
         notFound(new JSONObject()
             .put("error", "not found").toString());
-        
+
         exception(IllegalArgumentException.class, Main::badRequest); 
         exception(JSONException.class, Main::badRequest);
         exception(EmptyResultException.class, 
             (e, request, response) -> response.status(404));
+
+        // Remove protection against XSS attack to try to exploit
+        afterAfter((request, response) -> {
+            response.header("X-XSS-Protection", "0");
+        });
 
     }
 
@@ -54,6 +62,7 @@ public class Main {
 
     private static void badRequest(Exception ex, Request request, Response response) {
         response.status(400);
-        response.body("{\"error\": \"" + ex + "\"}");
+        //remove the leak of the exception class details by using ex.geytMessage instead of just ex
+        response.body("{\"error\": \"" + ex.getMessage() + "\"}");
     }
 }
