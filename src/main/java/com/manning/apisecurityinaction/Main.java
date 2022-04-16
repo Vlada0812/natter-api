@@ -30,12 +30,46 @@ public class Main {
 
         post("/spaces", spaceController::createSpace);
 
+        before(((request, response) -> {
+            if (request.requestMethod().equals("POST") &&
+                !"application/json".equals(request.contentType())) {
+                    halt(415, new JSONObject().put(
+                        "error", "Only application/json supported"
+                    ).toString());
+                }
+        }));
         after((request, response) -> {
             response.type("application/json");
         });
-        // Remove the header containing the server type from the response
-        afterAfter((request, response) ->
-            response.header("Server", ""));
+
+        afterAfter((request, response) -> {
+
+            // Remove the header containing the server type from the response
+            response.header("X-XSS-Protection", "0");
+
+            //utf8 to avoid stealing data through JSON response
+            response.type("application/json;charset=utf-8");
+
+            //nonsniff to prevent browser guessing the correct Content Type
+            response.header("X-Content-Type-Options", "nonsniff");
+
+            //prevent API responses from being loaded in a frame or iframe.
+            response.header("X-Frame-Options", "DENY");
+
+            //disable caching
+            response.header("Cache-Control","no-store");
+
+            //Tells the browser to ignore suspected XSS attacks as it causes another securtiy attacks.
+            response.header("X-XSS-Protection", "0");
+
+            //default-src prevents the response from loading any script
+            //frame-ancestors prevents the response being loaded into an iframe
+            //sandbox disables scripts and other potentially dangerous content
+            response.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox");
+
+            //remove revealing server type in response
+            response.header("Server", "");
+        });
 
         internalServerError(new JSONObject()
             .put("error", "internal server error").toString());
@@ -46,12 +80,6 @@ public class Main {
         exception(JSONException.class, Main::badRequest);
         exception(EmptyResultException.class, 
             (e, request, response) -> response.status(404));
-
-        // Remove protection against XSS attack to try to exploit
-        afterAfter((request, response) -> {
-            response.header("X-XSS-Protection", "0");
-        });
-
     }
 
     private static void createTables(Database database) throws Exception {
@@ -62,7 +90,9 @@ public class Main {
 
     private static void badRequest(Exception ex, Request request, Response response) {
         response.status(400);
+        //User proper JSON library for all outputs
         //remove the leak of the exception class details by using ex.geytMessage instead of just ex
-        response.body("{\"error\": \"" + ex.getMessage() + "\"}");
+        response.body(new JSONObject()
+            .put("error", ex.getMessage()).toString());
     }
 }
