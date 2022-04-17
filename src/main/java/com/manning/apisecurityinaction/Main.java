@@ -8,6 +8,7 @@ import org.dalesbred.result.EmptyResultException;
 import org.h2.jdbcx.JdbcConnectionPool;
 import org.json.*;
 import spark.*;
+import com.google.common.util.concurrent.*;
 
 import static spark.Spark.*;
 
@@ -27,6 +28,19 @@ public class Main {
 
         database = Database.forDataSource(datasource);
         var spaceController = new SpaceController(database);
+
+        //Create the rate limiter object and allow just 2 API requests per second
+        var rateLimiter = RateLimiter.create(2.0d);
+
+        before((request, response) -> {
+            //Check if the rate has been exceeded
+            if (!rateLimiter.tryAcquire()){
+                //Header identicating the client should retry
+                response.header("Retry-After", "2");
+                //Return http response 429 too many requests status
+                halt(429);
+            }
+        });
 
         post("/spaces", spaceController::createSpace);
 
