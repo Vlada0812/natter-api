@@ -15,6 +15,9 @@ import static spark.Spark.*;
 public class Main {
 
     public static void main(String... args) throws Exception {
+
+        //Use localhost.p12 self signed certificate api server to enable https connection
+        secure("localhost.p12", "changeit", null, null);
         
         //Intialize the database with priveleged user
         var datasource = JdbcConnectionPool.create(
